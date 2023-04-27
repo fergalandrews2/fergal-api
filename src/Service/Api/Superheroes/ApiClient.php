@@ -6,19 +6,19 @@ namespace App\Service\Api\Superheroes;
 
 use App\Entity\Superheroes;
 use App\Factory\JsonResponseFactory;
-use DateTime;
-use DateTimeInterface;
-use DateTimeZone;
+use App\Service\Api;
+use App\Utility\ApiUtilities;
 use Doctrine\ORM\EntityManagerInterface;
 use Exception;
-use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 class ApiClient
 {
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
-        private readonly JsonResponseFactory $jsonResponseFactory
+        private readonly JsonResponseFactory $jsonResponseFactory,
+        public ApiUtilities $apiUtilities
     ){}
 
     /**
@@ -47,7 +47,7 @@ class ApiClient
             $superheroes = new Superheroes();
             $superheroes->setName($request->get('name'));
             $superheroes->setSlug($request->get('slug'));
-            $superheroes->setCreated($this->getDateTime());
+            $superheroes->setCreated($this->apiUtilities->getDateTime());
             $this->entityManager->persist($superheroes);
             $this->entityManager->flush();
 
@@ -105,15 +105,13 @@ class ApiClient
                 return $this->jsonResponseFactory->create((object)$data, 404);
             }
 
-            $request = $this->transformJsonBody($request);
-
             if (!$request->get('name') || !$request->get('slug')) {
                 throw new Exception();
             }
 
             $hero->setName($request->get('name'));
             $hero->setSlug($request->get('slug'));
-            $hero->setUpdated($this->getDateTime());
+            $hero->setUpdated($this->apiUtilities->getDateTime());
 
             $this->entityManager->persist($hero);
             $this->entityManager->flush();
@@ -158,34 +156,5 @@ class ApiClient
         ];
 
         return $this->jsonResponseFactory->create((object)$data);
-    }
-
-    /**
-     * @return DateTimeInterface
-     */
-    private function getDateTime(): DateTimeInterface
-    {
-        return DateTime::createFromFormat(
-            'Y-m-d H:i:s',
-            date('Y-m-d H:i:s'),
-            new DateTimeZone('Europe/London')
-        );
-    }
-
-    /**
-     * @param Request $request
-     * @return Request
-     */
-    protected function transformJsonBody(Request $request): Request
-    {
-        $data = json_decode($request->getContent(), true);
-
-        if ($data === null) {
-            return $request;
-        }
-
-        $request->request->replace($data);
-
-        return $request;
     }
 }
